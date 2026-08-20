@@ -962,11 +962,14 @@
     populatePageSelect();
   }
 
+  const NEW_PAGE_OPTION = '__new_page__';
+
   function populatePageSelect(){
     const sel = document.getElementById('newCompPage');
     const current = sel.value;
     sel.innerHTML = '<option value="" disabled selected>Selecione a página</option>' +
-      state.data.pages.map(p => `<option>${escapeHtml(p)}</option>`).join('');
+      state.data.pages.map(p => `<option>${escapeHtml(p)}</option>`).join('') +
+      `<option value="${NEW_PAGE_OPTION}">+ Criar nova página...</option>`;
     if(current && state.data.pages.includes(current)) sel.value = current;
   }
 
@@ -1452,19 +1455,37 @@
     toast(cfg.doneMsg);
   });
 
-  // ---------- Modal: excluir bug (exige senha) ----------
   // ---------- Modal: nova página (sem senha nesta variante) ----------
   const CREATE_PAGE_PASSWORD = 'EQI@2025'; // ainda usada pela exclusão de página
   const newPageModal = document.getElementById('newPageModal');
+  let newPageFromBugFlow = false;
 
-  document.getElementById('newPageBtn').addEventListener('click', () => {
+  function openNewPageModal(fromBugFlow){
+    newPageFromBugFlow = !!fromBugFlow;
     document.getElementById('newPageName').value = '';
+    if(newPageFromBugFlow){
+      // Esconde o cadastro do bug enquanto cria a página, e depois volta
+      // pra ele exatamente de onde parou.
+      newCompModal.classList.remove('open');
+    }
     newPageModal.classList.add('open');
     document.getElementById('newPageName').focus();
-  });
+  }
+
+  function returnToBugFlow(selectedPage){
+    if(!newPageFromBugFlow) return;
+    newPageFromBugFlow = false;
+    const sel = document.getElementById('newCompPage');
+    sel.value = selectedPage && state.data.pages.includes(selectedPage) ? selectedPage : '';
+    newCompModal.classList.add('open');
+    showModalStep(1);
+  }
+
+  document.getElementById('newPageBtn').addEventListener('click', () => openNewPageModal(false));
 
   document.getElementById('cancelNewPage').addEventListener('click', () => {
     newPageModal.classList.remove('open');
+    returnToBugFlow(null);
   });
 
   document.getElementById('confirmNewPage').addEventListener('click', async () => {
@@ -1478,6 +1499,7 @@
     newPageModal.classList.remove('open');
     populatePageSelect();
     renderAll();
+    returnToBugFlow(name);
     toast('Página criada.');
   });
 
@@ -1601,12 +1623,20 @@
   document.getElementById('modalStep1Next').addEventListener('click', () => {
     const format = document.getElementById('newCompFormat').value;
     const page = document.getElementById('newCompPage').value;
+    if(page === NEW_PAGE_OPTION){ openNewPageModal(true); return; }
     if(!page){ toast('Selecione a página.'); return; }
     document.getElementById('modalStep2Context').textContent = `${format} · ${page}`;
     showModalStep(2);
     document.getElementById('f_title').focus();
     checkDuplicatesInModal();
   });
+
+  // Escolher "+ Criar nova página..." abre o fluxo de criação na hora,
+  // sem obrigar o usuário a sair do cadastro do bug.
+  document.getElementById('newCompPage').addEventListener('change', (e) => {
+    if(e.target.value === NEW_PAGE_OPTION) openNewPageModal(true);
+  });
+
   document.getElementById('newCompPage').addEventListener('keydown', (e) => {
     if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('modalStep1Next').click(); }
   });
