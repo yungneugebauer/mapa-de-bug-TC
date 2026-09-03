@@ -1063,6 +1063,12 @@
     }
   }
 
+  // Quem está usando a ferramenta agora (campo Relator na lateral).
+  function currentUserName(){
+    const el = document.getElementById('reporterInput');
+    return (el && el.value.trim()) || state.reporterName || '';
+  }
+
   function normalizeState(s){
     const d = s && typeof s === 'object' ? s : {};
     return {
@@ -1397,7 +1403,7 @@
         if(el.value === 'Resolvido' || el.value === 'Não existente'){
           openStatusNoteModal(bug, el.value);
         } else {
-          const ok = await sendOp({ op: 'updateBug', bugId: bug.id, fields: { status: el.value } });
+          const ok = await sendOp({ op: 'updateBug', bugId: bug.id, fields: { status: el.value }, by: currentUserName() });
           renderAll();
           if(ok) toast('Status atualizado.');
         }
@@ -1529,7 +1535,7 @@
       fields[cfg.atField] = Date.now();
       fields[cfg.imageField] = pendingResolveImage || null;
       fields[cfg.byField] = byName;
-      await sendOp({ op: 'updateBug', bugId: bug.id, fields });
+      await sendOp({ op: 'updateBug', bugId: bug.id, fields, by: byName });
     }
     pendingStatusBugId = null;
     pendingStatus = null;
@@ -1576,7 +1582,7 @@
     const exists = state.data.pages.some(p => p.toLowerCase() === name.toLowerCase());
     if(exists){ toast('Essa página já existe.'); return; }
 
-    const ok = await sendOp({ op: 'addPage', name });
+    const ok = await sendOp({ op: 'addPage', name, by: currentUserName() });
     newPageModal.classList.remove('open');
     populatePageSelect();
     renderAll();
@@ -1778,6 +1784,7 @@
       const ok = await sendOp({
         op: 'updateBug',
         bugId: editingBugId,
+        by: currentUserName(),
         component: componentRef,
         fields: {
           title,
@@ -1798,6 +1805,7 @@
 
     const ok = await sendOp({
       op: 'createBug',
+      by: reporterName,
       component: componentRef,
       bug: {
         id: uid(),
@@ -1840,9 +1848,9 @@
 
     box.innerHTML = '<div class="log-list-wrap">' + logs.map(l => {
       const quando = new Date(l.at).toLocaleString('pt-BR');
+      const local = [l.format, l.page, l.component].filter(Boolean).join(' · ');
       let oque;
       if(l.action === 'deleteBug'){
-        const local = [l.format, l.page, l.component].filter(Boolean).join(' · ');
         oque = `excluiu o bug <b>${escapeHtml(l.title || '')}</b>` +
                (local ? ` em ${escapeHtml(local)}` : '') +
                (l.reporter ? ` · relatado por ${escapeHtml(l.reporter)}` : '');
@@ -1850,6 +1858,13 @@
         const n = l.bugsRemoved || 0;
         oque = `excluiu a página <b>${escapeHtml(l.page || '')}</b> e ${n} bug${n===1?'':'s'} junto` +
                (Array.isArray(l.titles) && l.titles.length ? `: ${escapeHtml(l.titles.join(', '))}` : '');
+      } else if(l.action === 'createBug'){
+        oque = `cadastrou o bug <b>${escapeHtml(l.title || '')}</b>` + (local ? ` em ${escapeHtml(local)}` : '');
+      } else if(l.action === 'updateBug'){
+        oque = (l.status ? `mudou para <b>${escapeHtml(l.status)}</b> o bug ` : 'alterou o bug ') +
+               `<b>${escapeHtml(l.title || '')}</b>` + (local ? ` em ${escapeHtml(local)}` : '');
+      } else if(l.action === 'addPage'){
+        oque = `criou a página <b>${escapeHtml(l.page || '')}</b>`;
       } else {
         oque = nomes[l.action] || `executou <b>${escapeHtml(l.action || '')}</b>`;
       }
