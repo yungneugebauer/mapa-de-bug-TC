@@ -370,11 +370,30 @@ module.exports = async function handler(req, res) {
       // reduziu os números e quando — foi o que faltou no incidente antigo.
       const isDeletion = body.op === 'deleteBug' || body.op === 'deletePage';
       if (!isDeletion) {
+        const extra = {};
+        if (body.op === 'createBug') {
+          const comp = state.components.find(c => c.id === state.bugs[state.bugs.length - 1].componentId);
+          extra.title = (body.bug && body.bug.title) || '';
+          if (comp) { extra.page = comp.page; extra.format = comp.format; extra.component = comp.component || ''; }
+        } else if (body.op === 'updateBug') {
+          const bug = state.bugs.find(b => b.id === body.bugId);
+          if (bug) {
+            const comp = state.components.find(c => c.id === bug.componentId);
+            extra.title = bug.title || '';
+            if (comp) { extra.page = comp.page; extra.format = comp.format; extra.component = comp.component || ''; }
+            // Se a alteração mexeu no status, registramos qual foi.
+            if (body.fields && body.fields.status) extra.status = body.fields.status;
+          }
+        } else if (body.op === 'addPage') {
+          extra.page = String(body.name || '').trim();
+        }
+
         addLog(state, {
           action: body.op,
           by: String(body.by || '').trim() || '—',
           before,
           after,
+          ...extra,
         });
       } else {
         // Nas exclusões o log detalhado já foi criado em applyOperation;
